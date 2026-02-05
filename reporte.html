@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Asistencia - UNES</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #f4f7f6;
+            padding-bottom: 50px;
+        }
+
+        .navbar-unes {
+            background: #198754;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            border-bottom: 4px solid #ffc107;
+        }
+
+        .student-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 6px solid #198754;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .pct-box {
+            text-align: center;
+            min-width: 65px;
+            padding: 8px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .critico {
+            background: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
+
+        .excelente {
+            background: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar-unes text-center shadow-sm mb-3 no-print">
+        SISTEMA DE PORCENTAJES UNES
+        <br>
+        <div class="btn-group mt-2">
+            <a href="index.html" class="btn btn-sm btn-light fw-bold">⬅️ VOLVER</a>
+            <button onclick="descargarPDF()" class="btn btn-sm btn-danger fw-bold">📄 DESCARGAR PDF</button>
+        </div>
+    </div>
+
+    <div class="container" id="contenido-pdf">
+        <div class="no-print">
+            <input type="text" id="txtBuscar" class="form-control mb-3 shadow-sm"
+                placeholder="🔍 Buscar alumno por nombre..." onkeyup="dibujar()">
+        </div>
+
+        <div class="d-none d-print-block mb-4 text-center">
+            <h3>REPORTE DE ASISTENCIA - UNES</h3>
+            <p id="fecha-reporte"></p>
+        </div>
+
+        <div id="loading" class="text-center my-5 no-print">
+            <div class="spinner-border text-success"></div>
+            <p>Calculando estadísticas...</p>
+        </div>
+
+        <div id="contenedorReporte"></div>
+    </div>
+
+    <script>
+        const API_URL = 'TU_URL_DE_APPSCRIPT_AQUI'; // <--- PEGA TU URL AQUÍ
+        let listaFull = [];
+
+        window.onload = async () => {
+            document.getElementById('fecha-reporte').innerText = "Generado el: " + new Date().toLocaleString();
+            try {
+                const res = await fetch(API_URL + "?modo=reporte");
+                listaFull = await res.json();
+                document.getElementById('loading').style.display = 'none';
+                dibujar();
+            } catch (e) {
+                document.getElementById('loading').innerHTML = "Error al conectar.";
+            }
+        };
+
+        function dibujar() {
+            const busqueda = document.getElementById('txtBuscar').value.toLowerCase();
+            const container = document.getElementById('contenedorReporte');
+
+            const filtrados = listaFull.filter(a => a.nombre.toLowerCase().includes(busqueda));
+
+            container.innerHTML = filtrados.map(a => {
+                const pct = Math.round((a.presentes / a.total) * 100);
+                const estilo = pct < 75 ? 'critico' : 'excelente';
+                return `
+                <div class="student-card">
+                    <div>
+                        <div class="fw-bold text-uppercase" style="font-size:0.9rem;">${a.nombre}</div>
+                        <small class="text-muted">${a.pnf} | Amb: ${a.ambiente}</small><br>
+                        <small class="fw-bold text-primary">Asistencias: ${a.presentes} de ${a.total}</small>
+                    </div>
+                    <div class="pct-box ${estilo}">${pct}%</div>
+                </div>`;
+            }).join('');
+        }
+
+        function descargarPDF() {
+            const elemento = document.getElementById('contenido-pdf');
+            const opciones = {
+                margin: 0.5,
+                filename: 'Reporte_Asistencia_UNES.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Ocultamos el buscador momentáneamente para el PDF
+            document.getElementById('txtBuscar').style.display = 'none';
+
+            html2pdf().set(opciones).from(elemento).save().then(() => {
+                document.getElementById('txtBuscar').style.display = 'block';
+            });
+        }
+    </script>
+</body>
+
+</html>
