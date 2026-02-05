@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia TIC - UNES</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/alertify.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/css/themes/bootstrap.min.css" />
+    <style>
+        body {
+            background-color: #f0f2f5;
+            padding-bottom: 110px;
+            font-family: sans-serif;
+        }
+
+        .navbar-unes {
+            background: #0d6efd;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            border-bottom: 4px solid #ffc107;
+        }
+
+        .filter-box {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid #dee2e6;
+        }
+
+        .student-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 5px solid #0d6efd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+        }
+
+        .sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            z-index: 1000;
+            box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .badge-lista {
+            background: #6c757d;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar-unes text-center shadow-sm">
+        CONTROL DE ASISTENCIA - TIC UNES
+    </div>
+
+    <div class="container mt-2">
+        <div class="filter-box shadow-sm mb-3">
+            <div class="row g-2">
+                <div class="col-6">
+                    <label class="form-label small fw-bold">PNF</label>
+                    <select id="selPnf" class="form-select shadow-sm" onchange="filtrar()"></select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-bold">Ambiente</label>
+                    <select id="selAmb" class="form-select shadow-sm" onchange="filtrar()"></select>
+                </div>
+                <div class="col-12 mt-3">
+                    <input type="text" id="txtBuscar" class="form-control shadow-sm"
+                        placeholder="🔍 Buscar por nombre o cédula..." onkeyup="filtrar()">
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Sincronizando alumnos...</p>
+        </div>
+
+        <form id="formAsistencia" style="display:none;">
+            <div id="listaAlumnos"></div>
+            <div class="sticky-footer container">
+                <button type="submit" id="btnGrabar" class="btn btn-primary w-100 btn-lg fw-bold shadow">
+                    GUARDAR EN GOOGLE SHEETS
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/alertifyjs@1.13.1/build/alertify.min.js"></script>
+    <script>
+        // PEGA TU URL AQUÍ
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx8UNrppO-8MnOTkN0EsE4XV89dEjZ_pH3z8Zx_X6ObiOX_qAJkzkTTNJIHvdX89CiIBA/exec';
+        let baseDatos = [];
+
+        window.onload = async () => {
+            try {
+                const response = await fetch(API_URL, { method: 'GET', redirect: 'follow' });
+                baseDatos = await response.json();
+
+                const pnfs = ["TODOS", ...new Set(baseDatos.map(a => a.pnf))];
+                const ambs = ["TODOS", ...new Set(baseDatos.map(a => a.ambiente))];
+
+                document.getElementById('selPnf').innerHTML = pnfs.filter(p => p).map(p => `<option value="${p}">${p}</option>`).join('');
+                document.getElementById('selAmb').innerHTML = ambs.filter(a => a).map(a => `<option value="${a}">${a}</option>`).join('');
+
+                filtrar();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('formAsistencia').style.display = 'block';
+                alertify.success('Datos Sincronizados');
+            } catch (e) {
+                console.error(e);
+                alertify.error('Error al conectar con Google Sheets');
+            }
+        };
+
+        function filtrar() {
+            const fP = document.getElementById('selPnf').value;
+            const fA = document.getElementById('selAmb').value;
+            const busqueda = document.getElementById('txtBuscar').value.toLowerCase();
+
+            const filtrados = baseDatos.filter(a => {
+                const cumplePnf = (fP === "TODOS" || a.pnf === fP);
+                const cumpleAmb = (fA === "TODOS" || a.ambiente === fA);
+                const cumpleBusqueda = a.nombre.toLowerCase().includes(busqueda) || a.cedula.toString().includes(busqueda);
+                return cumplePnf && cumpleAmb && cumpleBusqueda;
+            });
+
+            const html = filtrados.map((a, i) => `
+            <div class="student-card shadow-sm">
+                <div>
+                    <div class="fw-bold text-uppercase" style="font-size:0.85rem">
+                        <span class="badge-lista">${a.nroLista}</span> ${a.nombre}
+                    </div>
+                    <small class="text-muted">CI: ${a.cedula} | ${a.ambiente}</small>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <input type="radio" class="btn-check" name="s_${i}" id="p_${i}" value="P" checked>
+                    <label class="btn btn-outline-success" for="p_${i}">P</label>
+                    <input type="radio" class="btn-check" name="s_${i}" id="a_${i}" value="A">
+                    <label class="btn btn-outline-danger" for="a_${i}">A</label>
+                    <input type="radio" class="btn-check" name="s_${i}" id="i_${i}" value="I">
+                    <label class="btn btn-outline-warning" for="i_${i}">I</label>
+                    <input type="radio" class="btn-check" name="s_${i}" id="j_${i}" value="J">
+                    <label class="btn btn-outline-info" for="j_${i}">J</label>
+                    
+                    <input type="hidden" name="n_${i}" value="${a.nombre}">
+                    <input type="hidden" name="nl_${i}" value="${a.nroLista}">
+                    <input type="hidden" name="ci_${i}" value="${a.cedula}">
+                    <input type="hidden" name="pnf_${i}" value="${a.pnf}">
+                    <input type="hidden" name="amb_${i}" value="${a.ambiente}">
+                </div>
+            </div>`).join('');
+
+            document.getElementById('listaAlumnos').innerHTML = html || '<p class="text-center py-4">No se hallaron alumnos con esos filtros.</p>';
+        }
+
+        document.getElementById('formAsistencia').onsubmit = function (e) {
+            e.preventDefault();
+            alertify.confirm('Confirmar Registro', '¿Seguro que desea guardar la asistencia actual?', function () {
+                const btn = document.getElementById('btnGrabar');
+                btn.disabled = true;
+                btn.innerText = "Sincronizando con Sheets...";
+
+                const formData = new FormData(e.target);
+                const listaParaEnviar = [];
+                const totalCards = document.getElementById('listaAlumnos').querySelectorAll('.student-card').length;
+
+                for (let i = 0; i < totalCards; i++) {
+                    if (formData.get(`n_${i}`)) {
+                        listaParaEnviar.push({
+                            nroLista: formData.get(`nl_${i}`),
+                            nombre: formData.get(`n_${i}`),
+                            cedula: formData.get(`ci_${i}`),
+                            pnf: formData.get(`pnf_${i}`),
+                            ambiente: formData.get(`amb_${i}`),
+                            estado: formData.get(`s_${i}`)
+                        });
+                    }
+                }
+
+                const datosFinales = new URLSearchParams();
+                datosFinales.append('datosAsistencia', JSON.stringify(listaParaEnviar));
+
+                fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: datosFinales
+                })
+                    .then(() => {
+                        alertify.success('¡Registro Exitoso!');
+                        setTimeout(() => {
+                            alertify.alert('¡Hecho!', 'Asistencia guardada en el orden solicitado.', () => location.reload());
+                        }, 1000);
+                    })
+                    .catch(err => {
+                        alertify.error('Error de red al enviar');
+                        btn.disabled = false;
+                        btn.innerText = "Guardar Asistencia";
+                    });
+            }, null).set('labels', { ok: 'SÍ, GUARDAR', cancel: 'CANCELAR' });
+        };
+    </script>
+</body>
+
+</html>
